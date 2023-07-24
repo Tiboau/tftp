@@ -1,0 +1,22 @@
+# 
+
+function load_video {
+insmod efi_gop
+insmod efi_uga
+insmod video_bochs
+insmod video_cirrus
+insmod all_video
+}
+
+load_video
+set gfxpayload=keep
+insmod gzio
+insmod part_gpt
+insmod ext2
+
+set timeout=5
+
+menuentry 'Install RHCOS Master Node' {
+linuxefi okd4/rhcos-{{ okd_version }}-x86_64-live-kernel-x86_64 rd.neednet=1 coreos.inst=yes coreos.inst.install_dev=sdb ignition.platform.id=metal coreos.inst.ignition_url="http://{{ baremetal_ip }}:8080/okd4/master.ign" coreos.live.rootfs_url="http://{{ baremetal_ip }}:8080/okd4/rhcos-{{ okd_version }}-x86_64-live-rootfs.x86_64.img" console=tty1 console=ttyS1,115200 ip={{ bond_name }}.{{ bond_vlan }}:dhcp:9000 bond={{ bond_name }}:{{ bond_interfaces }}:mode=802.3ad vlan={{ bond_name }}.{{ bond_vlan }}:{{ bond_name }}
+initrdefi okd4/rhcos-{{ okd_version }}-x86_64-live-initramfs.x86_64.img
+}

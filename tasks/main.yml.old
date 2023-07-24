@@ -1,0 +1,72 @@
+---
+# tasks file for tftp
+- name: install packages
+  ansible.builtin.dnf:
+    name:
+      - tftp-server
+      - tftp
+    state: present
+
+- name: Create folder
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /var/lib/tftpboot/pxelinux/pxelinux.cfg
+    - /root/syslinux
+
+- name: Get syslinyx
+  community.general.iso_extract:
+    image: /dev/sr0
+    dest: /root/syslinux
+    files:
+    - BaseOS/Packages/syslinux-tftpboot-6.04-5.el8.noarch.rpm
+
+- name: Extract syslinux
+  script: "/usr/bin/rpm2cpio syslinux-tftpboot-6.04-5.el8.noarch.rpm | /usr/bin/cpio -dimv"
+  args:
+    chdir: /root/syslinux
+
+- name: copy
+  ansible.builtin.copy:
+    src: /root/syslinux/tftpboot/
+    dest: "/var/lib/tftpboot/pxelinux"
+    remote_src: yes
+
+- name: Get vmlinuz initrd
+  community.general.iso_extract:
+    image: /dev/sr0
+    dest: /var/lib/tftpboot/pxelinux
+    files:
+    - images/pxeboot/initrd.img
+    - images/pxeboot/vmlinuz
+
+- name: Push tftp conf
+  ansible.builtin.template:
+    src: default.j2
+    dest: "/var/lib/tftpboot/pxelinux/pxelinux.cfg/01-{{ item.mac_address | replace (':','-') }}"
+  loop: "{{ pxe[0].servers | json_query('[]') }}"
+
+- name: start service
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: yes
+    immediate: yes
+    state: enabled
+  loop:
+    - tftp
+    - tftp-client
+
+- name: TFTP 755
+  ansible.builtin.file:
+    path: "/var/lib/tftpboot"
+    state: directory
+    recurse: yes
+    mode: '0755'
+
+- name: Start TFTP Socket
+  ansible.builtin.service:
+    name: tftp.socket
+    state: started
+

@@ -1,0 +1,7 @@
+default menu.c32
+#default vesamenu.c32
+timeout 60
+
+LABEL pxeboot
+    KERNEL http://{{ http_coreos_image }}/pxe/rhcos/ignition/rhcos-{{ coreos_version_mineur }}-x86_64-live-kernel-x86_64
+    APPEND initrd=http://{{ http_coreos_image }}/pxe/rhcos/ignition/rhcos-{{ coreos_version_mineur }}-x86_64-live-initramfs.x86_64.img coreos.inst.install_dev=/dev/vda coreos.inst.ignition_url=http://{{ http_coreos_image }}/pxe/rhcos/ignition/bootstrap.ign coreos.live.rootfs_url=http://{{ http_coreos_image }}/pxe/rhcos/ignition/rhcos-{{ coreos_version_mineur }}-x86_64-live-rootfs.x86_64.img

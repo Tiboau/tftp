@@ -1,0 +1,9 @@
+#default menu.c32
+default vesamenu.c32
+timeout 60
+
+display boot.msg
+label centos9
+  menu label ^Install Centos 9 Stream
+  kernel pxeboot/{{ item.release }}/vmlinuz
+  append initrd=pxeboot/{{ item.release }}/initrd.img showopts inst.ks=http://{{ hostvars[inventory_hostname].ansible_host }}/{{ item.release }}/ks_files/{{ item.hostname }}.ks ip=dhcp net.ifnames=0 biosdevname=0

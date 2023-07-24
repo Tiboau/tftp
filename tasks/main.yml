@@ -1,0 +1,89 @@
+---
+# tasks file for tftp
+- name: install packages
+  ansible.builtin.dnf:
+    name:
+      - tftp-server
+      - tftp
+    state: present
+
+- name: Create folder
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /var/lib/tftpboot/pxelinux/pxelinux.cfg
+    - /root/syslinux
+    - "/var/lib/tftpboot/pxelinux/pxeboot/{{ os_release9 }}"
+    - "/var/lib/tftpboot/pxelinux/pxeboot/{{ os_release8 }}"
+
+- name: Get syslinux
+  ansible.builtin.dnf:
+    name: syslinux-tftpboot
+    download_dir: /var/lib/tftpboot/pxelinux/pxeboot
+    download_only: yes
+  register: syslinux_name
+
+- name: Extract syslinux
+  ansible.builtin.shell: "/usr/bin/rpm2cpio {{ syslinux_name.results[0] | regex_replace('Downloaded: ','') }}.rpm | /usr/bin/cpio -dimv"
+  args:
+    chdir: /var/lib/tftpboot/pxelinux/pxeboot
+
+- name: Get VMLinuz and initrd.imag
+  ansible.builtin.get_url:
+    url: "{{ item.vmlinuz }}"
+    dest: "/var/lib/tftpboot/pxelinux/pxeboot/{{ item.release }}/"
+  loop: "{{ pxe[0].servers | json_query('[]')}}"
+
+- name: Get VMLinuz and initrd.imag
+  ansible.builtin.get_url:
+    url: "{{ item.initrd }}"
+    dest: "/var/lib/tftpboot/pxelinux/pxeboot/{{ item.release }}/"
+  loop: "{{ pxe[0].servers | json_query('[]')}}"
+
+- name: copy
+  ansible.builtin.copy:
+    src: "/var/lib/tftpboot/pxelinux/pxeboot/tftpboot/"
+    dest: "/var/lib/tftpboot/pxelinux"
+    remote_src: yes
+
+- name: Push tftp conf
+  ansible.builtin.template:
+    src: default.j2
+    dest: "/var/lib/tftpboot/pxelinux/pxelinux.cfg/01-{{ item.mac_address | lower | replace (':','-') }}"
+  loop: "{{ pxe[0].servers | json_query('[]') }}"
+  when:
+    - item.okd is not defined
+
+- name: Push tftp conf
+  ansible.builtin.template:
+    src: bootstrap.cfg.j2
+    dest: "/var/lib/tftpboot/pxelinux/pxelinux.cfg/01-{{ item.mac_address | lower | replace (':','-') }}"
+  loop: "{{ pxe[0].servers | json_query('[]') }}"
+  when:
+    - item.okd is defined
+    - item.okd|bool == true
+    - '"bootstrap" in item.hostname'
+
+- name: start service
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: yes
+    immediate: yes
+    state: enabled
+  loop:
+    - tftp
+
+- name: TFTP 755
+  ansible.builtin.file:
+    path: "/var/lib/tftpboot"
+    state: directory
+    recurse: yes
+    mode: '0755'
+
+- name: Start TFTP Socket
+  ansible.builtin.service:
+    name: tftp.socket
+    state: started
+    enabled: yes
